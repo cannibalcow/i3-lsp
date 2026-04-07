@@ -1,3 +1,4 @@
+use crate::diagnostics::check_for_duplicate_bindings;
 use crate::parser::parse_config;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::{
@@ -28,7 +29,10 @@ impl I3Backend {
         let mut diagnosics = Vec::new();
 
         match parse_config(&text) {
-            Ok((_, cfg)) => {}
+            Ok((_, cfg)) => {
+                let mut duplicates = check_for_duplicate_bindings(&cfg);
+                diagnosics.append(&mut duplicates);
+            }
             Err(err) => diagnosics.push(Diagnostic {
                 range: Range::default(),
                 severity: Some(DiagnosticSeverity::ERROR),
@@ -82,19 +86,16 @@ impl LanguageServer for I3Backend {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        event!(Level::INFO, "Did open: {}", params.text_document.text);
         self.check(params.text_document.uri, params.text_document.text)
             .await;
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        event!(Level::INFO, "Did change: {:?}", params);
         let text = &params.content_changes[0].text;
         self.check(params.text_document.uri, text.clone()).await;
     }
 
     async fn completion(&self, _: CompletionParams) -> Result<Option<CompletionResponse>> {
-        event!(Level::INFO, "Did completion: !! ");
         Ok(Some(CompletionResponse::Array(vec![
             CompletionItem::new_simple("bindsym".into(), "Bind a key".into()),
             CompletionItem::new_simple("set".into(), "Set variable".into()),
