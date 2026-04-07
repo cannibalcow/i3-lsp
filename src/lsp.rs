@@ -12,8 +12,6 @@ use tower_lsp::{
 };
 use tracing::{Level, event};
 
-use crate::analysis::analyze;
-
 pub struct I3Backend {
     client: Client,
 }
@@ -78,7 +76,7 @@ impl LanguageServer for I3Backend {
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        event!(Level::INFO, "Did change: ");
+        event!(Level::INFO, "Did change: {:?}", params);
         let text = &params.content_changes[0].text;
         self.check(params.text_document.uri, text.clone()).await;
     }

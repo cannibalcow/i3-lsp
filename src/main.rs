@@ -1,5 +1,5 @@
-mod analysis;
 mod lsp;
+mod parser;
 
 use lsp::I3Backend;
 use tower_lsp::{LspService, Server};

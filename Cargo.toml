@@ -4,8 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-pest = "2.8.6"
-pest_derive = "2.8.6"
+nom = "8.0.0"
 thiserror = "2.0.18"
 tokio = { version = "1.51.0", features = ["full"] }
 tower-lsp = "0.20.0"
