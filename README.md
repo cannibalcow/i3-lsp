@@ -13,7 +13,7 @@
 ```lua
 -- ~/.config/nvim/lsp/i3_lsp.lua
 return {
-  cmd = { "/home/heldt/git/i3-lsp/target/debug/i3-lsp" },
+  cmd = { "/home/johndoe/git/i3-lsp/target/debug/i3-lsp" },
   filetypes = { "i3config" },
   single_file_support = true,
 }
