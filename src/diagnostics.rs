@@ -4,37 +4,34 @@ use i3_lsp::{ConfigLine, I3Configuration};
 use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 
 pub fn check_for_duplicate_bindings(cfg: &I3Configuration) -> Vec<Diagnostic> {
-    let mut bindings: HashMap<String, usize> = HashMap::new();
-    let mut digag: Vec<Diagnostic> = Vec::new();
+    let mut seen_bindings: HashMap<String, usize> = HashMap::new();
+    let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     for (line_num, line) in cfg.lines.iter().enumerate() {
-        if let ConfigLine::Binding {
-            modifiers,
-            key,
-            command: _command,
-        } = line
-        {
-            let binding_key = format!("{}+{}", modifiers.join("+"), key);
-            if bindings.contains_key(&binding_key) {
-                digag.push(Diagnostic {
-                    range: Range {
-                        start: Position::new(line_num as u32, 0),
-                        end: Position::new(line_num as u32, key.len() as u32),
-                    },
-                    severity: Some(DiagnosticSeverity::ERROR),
-                    message: format!("Duplicate binding: '{}'", key),
-                    ..Default::default()
-                });
-            }
+        let ConfigLine::Binding { modifiers, key, .. } = line else {
+            continue;
+        };
 
-            bindings
-                .entry(binding_key)
-                .and_modify(|v| *v += 1)
-                .or_insert(0);
+        let binding_key = format!("{}+{}", modifiers.join("+"), key);
+
+        if seen_bindings.contains_key(&binding_key) {
+            diagnostics.push(Diagnostic {
+                range: Range {
+                    start: Position::new(line_num as u32, 0),
+                    end: Position::new(line_num as u32, binding_key.len() as u32),
+                },
+                severity: Some(DiagnosticSeverity::ERROR),
+                message: format!("Duplicate key binding: '{}'", binding_key),
+                ..Default::default()
+            });
         }
-    }
 
-    return digag;
+        seen_bindings
+            .entry(binding_key)
+            .and_modify(|v| *v += 1)
+            .or_insert(0);
+    }
+    diagnostics
 }
 
 #[cfg(test)]
