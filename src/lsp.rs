@@ -1,3 +1,4 @@
+use crate::parser::parse_config;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::{
     CompletionItem, CompletionParams, CompletionResponse, Diagnostic, DiagnosticSeverity,
@@ -26,6 +27,17 @@ impl I3Backend {
     async fn check(&self, uri: Url, text: String) {
         let mut diagnosics = Vec::new();
 
+        match parse_config(&text) {
+            Ok((_, cfg)) => {}
+            Err(err) => diagnosics.push(Diagnostic {
+                range: Range::default(),
+                severity: Some(DiagnosticSeverity::ERROR),
+                message: err.to_string(),
+                ..Default::default()
+            }),
+        }
+
+        //    self.client.publish_diagnostics(uri, diagnosics, None).await;
         for (i, line) in text.lines().enumerate() {
             if line.contains("error") {
                 diagnosics.push(Diagnostic {

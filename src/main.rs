@@ -1,3 +1,4 @@
+mod diagnostics;
 mod lsp;
 mod parser;
 
