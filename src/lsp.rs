@@ -3,7 +3,7 @@ use crate::parser::parse_config;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::{
     CompletionItem, CompletionParams, CompletionResponse, Diagnostic, DiagnosticSeverity,
-    DidChangeTextDocumentParams, DidOpenTextDocumentParams, Position, Range, Url,
+    DidChangeTextDocumentParams, DidOpenTextDocumentParams, Range, Url,
 };
 use tower_lsp::{
     Client, LanguageServer,
@@ -12,6 +12,7 @@ use tower_lsp::{
         ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
     },
 };
+use tracing::{Level, event};
 
 pub struct I3Backend {
     client: Client,
@@ -32,24 +33,17 @@ impl I3Backend {
                 let mut duplicates = check_for_duplicate_bindings(&cfg);
                 diagnosics.append(&mut duplicates);
             }
-            Err(err) => diagnosics.push(Diagnostic {
-                range: Range::default(),
-                severity: Some(DiagnosticSeverity::ERROR),
-                message: err.to_string(),
-                ..Default::default()
-            }),
-        }
+            Err(err) => {
+                event!(
+                    Level::ERROR,
+                    "Could not parse i3 configuration: {}",
+                    err.to_string()
+                );
 
-        //    self.client.publish_diagnostics(uri, diagnosics, None).await;
-        for (i, line) in text.lines().enumerate() {
-            if line.contains("error") {
                 diagnosics.push(Diagnostic {
-                    range: Range {
-                        start: Position::new(i as u32, 0),
-                        end: Position::new(i as u32, line.len() as u32),
-                    },
+                    range: Range::default(),
                     severity: Some(DiagnosticSeverity::ERROR),
-                    message: "Sluta the word 'error'".into(),
+                    message: err.to_string(),
                     ..Default::default()
                 })
             }
