@@ -12,7 +12,6 @@ use tower_lsp::{
         ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
     },
 };
-use tracing::{Level, event};
 
 pub struct I3Backend {
     client: Client,
