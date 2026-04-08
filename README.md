@@ -4,6 +4,13 @@
 
 - Duplicate bindings warnings 
 
+
+## Todo
+- Uknown variables
+- Autocompletion
+- parse "mode" parts
+
+
 ## Installation
 
   cargo build --release

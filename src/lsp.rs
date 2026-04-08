@@ -1,4 +1,4 @@
-use crate::diagnostics::check_for_duplicate_bindings;
+use crate::diagnostics::{check_for_duplicate_bindings, check_variables};
 use crate::parser::parse_config;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::{
@@ -30,8 +30,8 @@ impl I3Backend {
 
         match parse_config(&text) {
             Ok((_, cfg)) => {
-                let mut duplicates = check_for_duplicate_bindings(&cfg);
-                diagnosics.append(&mut duplicates);
+                diagnosics.append(&mut check_for_duplicate_bindings(&cfg));
+                diagnosics.append(&mut check_variables(&cfg));
             }
             Err(err) => {
                 event!(
