@@ -1,6 +1,7 @@
 use i3_lsp::{ConfigLine, I3Configuration};
 
 use nom::{
+    Err::Error,
     IResult, Parser,
     branch::alt,
     bytes::complete::{tag, take_till, take_while},
@@ -72,9 +73,38 @@ fn parse_raw(input: &str) -> IResult<&str, ConfigLine> {
     Ok((input, ConfigLine::RawLine(line.trim().to_string())))
 }
 
+fn quoted_string(input: &str) -> IResult<&str, &str> {
+    let (input, _) = char('"')(input)?;
+    let (input, name) = take_till(|c| c == '"')(input)?;
+    let (input, _) = char('"')(input)?;
+    Ok((input, name))
+}
+
+fn not_closing_brace(input: &str) -> IResult<&str, ConfigLine> {
+    if input.trim_start().starts_with('}') {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Char,
+        )));
+    }
+    parse_line(input)
+}
+
+fn parse_mode(input: &str) -> IResult<&str, ConfigLine> {
+    let (input, _) = (space0, tag("mode"), space1).parse(input)?;
+    let (input, _) = alt((quoted_string, identifier)).parse(input)?;
+    let (input, _) = (space0, char('{'), opt(line_ending)).parse(input)?;
+
+    let (input, lines) = many0(not_closing_brace).parse(input)?;
+
+    let (input, _) = (space0, char('}'), opt(line_ending)).parse(input)?;
+
+    Ok((input, ConfigLine::Mode(I3Configuration { lines })))
+}
+
 fn parse_line(input: &str) -> IResult<&str, ConfigLine> {
     if input.is_empty() {
-        return Err(nom::Err::Error(nom::error::Error::new(
+        return Err(Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Eof,
         )));
@@ -90,6 +120,7 @@ fn parse_line(input: &str) -> IResult<&str, ConfigLine> {
         parse_set,
         parse_binding,
         parse_exec,
+        parse_mode,
         parse_raw,
     ))
     .parse(input)?;

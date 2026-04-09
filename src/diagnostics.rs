@@ -3,33 +3,67 @@ use std::collections::{HashMap, HashSet};
 use i3_lsp::{ConfigLine, I3Configuration};
 use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 
+fn line_count(line: &ConfigLine) -> usize {
+    match line {
+        ConfigLine::Mode(inner_cfg) => {
+            1 + inner_cfg.lines.iter().map(line_count).sum::<usize>() + 1
+        }
+        _ => 1,
+    }
+}
+
+fn collect_bindings_with_offset(
+    lines: &[ConfigLine],
+    offset: usize,
+    scope: &str,
+    out: &mut Vec<(String, usize)>,
+) {
+    let mut current_line = offset;
+    for line in lines.iter() {
+        match line {
+            ConfigLine::Binding { modifiers, key, .. } => {
+                let binding_key = format!("{}:{}+{}", scope, modifiers.join("+"), key);
+                out.push((binding_key, current_line));
+            }
+            ConfigLine::Mode(inner_cfg) => {
+                collect_bindings_with_offset(
+                    &inner_cfg.lines,
+                    current_line + 1,
+                    &format!("mode:{}", scope),
+                    out,
+                );
+            }
+            _ => {}
+        }
+        current_line += line_count(line);
+    }
+}
+
 pub fn check_for_duplicate_bindings(cfg: &I3Configuration) -> Vec<Diagnostic> {
-    let mut seen_bindings: HashMap<String, usize> = HashMap::new();
+    let mut all_bindings: Vec<(String, usize)> = Vec::new();
+    collect_bindings_with_offset(&cfg.lines, 0, "global", &mut all_bindings);
+
+    let mut seen: HashMap<String, usize> = HashMap::new();
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
-    for (line_num, line) in cfg.lines.iter().enumerate() {
-        let ConfigLine::Binding { modifiers, key, .. } = line else {
-            continue;
-        };
-
-        let binding_key = format!("{}+{}", modifiers.join("+"), key);
-
-        if seen_bindings.contains_key(&binding_key) {
+    for (binding_key, line_num) in &all_bindings {
+        if let Some(first_line) = seen.get(binding_key) {
             diagnostics.push(Diagnostic {
                 range: Range {
-                    start: Position::new(line_num as u32, 0),
-                    end: Position::new(line_num as u32, binding_key.len() as u32),
+                    start: Position::new(*line_num as u32, 0),
+                    end: Position::new(*line_num as u32, binding_key.len() as u32),
                 },
                 severity: Some(DiagnosticSeverity::ERROR),
-                message: format!("Duplicate key binding: '{}'", binding_key),
+                message: format!(
+                    "Duplicate key binding: '{}' (first seen on line {})",
+                    binding_key,
+                    first_line + 1
+                ),
                 ..Default::default()
             });
+        } else {
+            seen.insert(binding_key.clone(), *line_num);
         }
-
-        seen_bindings
-            .entry(binding_key)
-            .and_modify(|v| *v += 1)
-            .or_insert(0);
     }
     diagnostics
 }
@@ -98,6 +132,7 @@ pub fn check_variables(cfg: &I3Configuration) -> Vec<Diagnostic> {
             ConfigLine::ExecCmd(_) => continue,
             ConfigLine::RawLine(_) => continue,
             ConfigLine::EmptyLine => continue,
+            ConfigLine::Mode(_) => continue,
         }
     }
 
@@ -142,8 +177,25 @@ mod test {
 
         let (_, cfg) = parse_config(config).unwrap();
 
-        let dups = check_variables(&cfg);
+        let errors = check_variables(&cfg);
 
-        assert_eq!(dups.len(), 1);
+        assert_eq!(errors.len(), 1);
+    }
+
+    #[test]
+    fn mode_duplicate_test() {
+        let config = r#"# i3 config
+                        mode resize {
+                            set $mod Mod4
+                            bindsym $mod+r mode "default"
+                        }
+
+                        bindsym $mod+r mode "resize"
+        "#;
+
+        let (_, cfg) = parse_config(config).unwrap();
+
+        let errors = check_for_duplicate_bindings(&cfg);
+        assert_eq!(errors.len(), 0);
     }
 }
